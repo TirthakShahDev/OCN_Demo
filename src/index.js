@@ -10,13 +10,13 @@ const cpoInfo = [
         partyID: "CPO",
         countryCode: "DE",
         backendPort: "3100",
-        client: "http://localhost:8080"
+        node: "http://localhost:8080"
     },
     {
         partyID: "CPX",
         countryCode: "NL",
         backendPort: "3101",
-        client: "http://localhost:8081"
+        node: "http://localhost:8081"
     }
 ]
 
@@ -49,34 +49,34 @@ async function main() {
          */
 
         // check registered status first
-        const clientURL = await contract.clientURLOf(utils.toHex(cpo.countryCode), utils.toHex(cpo.partyID))
+        const nodeURL = await contract.clientURLOf(utils.toHex(cpo.countryCode), utils.toHex(cpo.partyID))
 
-        if (clientURL === "") {
+        if (nodeURL === "") {
 
             /**
              * Register to OCN Registry
              */
 
-            // Get OCN client info
-            const clientInfoRes = await fetch(`${cpo.client}/ocn/registry/client-info`)
-            const clientInfoBody = await clientInfoRes.json()
+            // Get OCN node info
+            const nodeInfoRes = await fetch(`${cpo.node}/ocn/registry/node-info`)
+            const nodeInfoBody = await nodeInfoRes.json()
 
             // sign the transaction data with the CPO's wallet (in this case randomly created)
-            const data = await signer.sign(utils.toHex(cpo.countryCode), utils.toHex(cpo.partyID), clientInfoBody.url, clientInfoBody.address, ethers.Wallet.createRandom())
+            const data = await signer.sign(utils.toHex(cpo.countryCode), utils.toHex(cpo.partyID), nodeInfoBody.url, nodeInfoBody.address, ethers.Wallet.createRandom())
             const tx = await contract.register(...data)
 
             await tx.wait()
 
-            console.log(`CPO [${cpo.countryCode} ${cpo.partyID}] written into OCN Registry with OCN client ${cpo.client}`)
+            console.log(`CPO [${cpo.countryCode} ${cpo.partyID}] written into OCN Registry with OCN node ${cpo.node}`)
         } else {
             console.log(`CPO [${cpo.countryCode} ${cpo.partyID}] has already registered to OCN Registry. Skipping...`)
         }
 
         /**
-         * Register CPO to OCN Client (if not already)
+         * Register CPO to OCN Node (if not already)
          */
 
-        const regCheckRes = await fetch(`${cpo.client}/admin/connection-status/${cpo.countryCode}/${cpo.partyID}`, {
+        const regCheckRes = await fetch(`${cpo.node}/admin/connection-status/${cpo.countryCode}/${cpo.partyID}`, {
             headers: {
                 "Authorization": "Token randomkey"
             }
@@ -88,10 +88,10 @@ async function main() {
 
 
             /**
-             * Request TOKEN_A via OCN Client admin panel 
+             * Request TOKEN_A via OCN Node admin panel 
              */
 
-            const adminRes = await fetch(`${cpo.client}/admin/generate-registration-token`, {
+            const adminRes = await fetch(`${cpo.node}/admin/generate-registration-token`, {
                 method: "POST",
                 headers: {
                     "Authorization": "Token randomkey",
@@ -103,7 +103,7 @@ async function main() {
             const adminBody = await adminRes.json()
 
             /**
-             * Get list of OCPI versions supported by OCN Client
+             * Get list of OCPI versions supported by OCN Node
              */
 
             const versionRes = await fetch(adminBody.versions, {
@@ -115,7 +115,7 @@ async function main() {
             const versionBody = await versionRes.json()
 
             /**
-             * Get and store v2.2 endpoints of OCPI module interfaces supported by OCN Client
+             * Get and store v2.2 endpoints of OCPI module interfaces supported by OCN Node
              */
 
             const versionDetailRes = await fetch(versionBody.data.versions.find(v => v.version === "2.2").url, {
@@ -125,13 +125,13 @@ async function main() {
             })
 
             const versionDetailBody = await versionDetailRes.json()
-            cpoBackend.clientEndpoints = versionDetailBody.data.endpoints
+            cpoBackend.nodeEndpoints = versionDetailBody.data.endpoints
 
             /**
-             * Register to OCN Client using OCPI credentials module
+             * Register to OCN Node using OCPI credentials module
              */
 
-            const regRes = await fetch(`${cpo.client}/ocpi/2.2/credentials`, {
+            const regRes = await fetch(`${cpo.node}/ocpi/2.2/credentials`, {
                 method: "POST",
                 headers: {
                     "Authorization": `Token ${adminBody.token}`,
@@ -154,15 +154,15 @@ async function main() {
             const regBody = await regRes.json()
             cpoBackend.saveTokenC(regBody.data.token)
 
-            console.log(`CPO [${cpo.countryCode} ${cpo.partyID}] completed OCPI connection with OCN client at ${cpo.client}`)
+            console.log(`CPO [${cpo.countryCode} ${cpo.partyID}] completed OCPI connection with OCN node at ${cpo.node}`)
         } else {
-            console.log(`CPO [${cpo.countryCode} ${cpo.partyID}] has already connected to OCN client at ${cpo.client}. Skipping...`)
+            console.log(`CPO [${cpo.countryCode} ${cpo.partyID}] has already connected to OCN node at ${cpo.node}. Skipping...`)
         }
 
     }
 
     /**
-     * Run the EMSP backend which will provide the version endpoints for the OCN Client during the credentials handshake/registration
+     * Run the EMSP backend which will provide the version endpoints for the OCN Node during the credentials handshake/registration
      */
 
     await mspBackend.start()
@@ -171,7 +171,7 @@ async function main() {
     /**
      * Check MSP connection/registration status
      */
-    const clientURLOfMSP = await contract.clientURLOf(utils.toHex("DE"), utils.toHex("MSP"))
+    const nodeURLOfMSP = await contract.clientURLOf(utils.toHex("DE"), utils.toHex("MSP"))
 
     const mspRegCheck = await fetch("http://localhost:8080/admin/connection-status/DE/MSP", {
         headers: {
@@ -181,7 +181,7 @@ async function main() {
 
     const mspRegCheckText = await mspRegCheck.text()
 
-    console.log(`MSP [DE MSP] connection status: [${clientURLOfMSP !== "" ? "x" : " "}] OCN Registry [${mspRegCheckText === "CONNECTED" ? "x" : " "}] OCN Client`)
+    console.log(`MSP [DE MSP] connection status: [${nodeURLOfMSP !== "" ? "x" : " "}] OCN Registry [${mspRegCheckText === "CONNECTED" ? "x" : " "}] OCN Node`)
 
 }
 

@@ -12,7 +12,7 @@ module.exports = class CpoBackend {
     static TOKEN_B = "f3f1985e-8341-490d-ab06-17584175998c"
 
     cpoInfo
-    clientEndpoints
+    nodeEndpoints
     app
 
     constructor(cpoInfo) {
@@ -219,7 +219,7 @@ module.exports = class CpoBackend {
                 if (req.params.command === "STOP_SESSION") {
                     console.log(`CPO [${this.cpoInfo.countryCode} ${this.cpoInfo.partyID}] sending cdr after session end`)                    
                     setTimeout(async () => {
-                        const postCdrResult = await fetch(`${this.cpoInfo.client}/ocpi/receiver/2.2/cdrs`, {
+                        const postCdrResult = await fetch(`${this.cpoInfo.node}/ocpi/receiver/2.2/cdrs`, {
                             method: "POST",
                             headers,
                             body: JSON.stringify(this.changeOwner(cpoData.cdrs))
