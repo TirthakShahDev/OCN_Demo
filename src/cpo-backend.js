@@ -9,11 +9,9 @@ const cpoData = require("./cpo-data.json")
 
 module.exports = class CpoBackend {
 
-    static TOKEN_B = "f3f1985e-8341-490d-ab06-17584175998c"
-
-    cpoInfo
-    nodeEndpoints
-    app
+    static get TOKEN_B() {
+        return "f3f1985e-8341-490d-ab06-17584175998c"
+    }
 
     constructor(cpoInfo) {
         this.cpoInfo = cpoInfo

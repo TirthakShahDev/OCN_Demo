@@ -109,11 +109,11 @@
         "type": "bytes3"
       },
       {
-        "name": "clientURL",
+        "name": "nodeURL",
         "type": "string"
       },
       {
-        "name": "clientAddress",
+        "name": "nodeAddress",
         "type": "address"
       },
       {
@@ -215,10 +215,10 @@
         "type": "bytes3"
       }
     ],
-    "name": "clientURLOf",
+    "name": "nodeURLOf",
     "outputs": [
       {
-        "name": "clientURL",
+        "name": "nodeURL",
         "type": "string"
       }
     ],
@@ -238,10 +238,10 @@
         "type": "bytes3"
       }
     ],
-    "name": "clientAddressOf",
+    "name": "nodeAddressOf",
     "outputs": [
       {
-        "name": "clientAddress",
+        "name": "nodeAddress",
         "type": "address"
       }
     ],

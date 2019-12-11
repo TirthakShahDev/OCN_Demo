@@ -49,7 +49,7 @@ async function main() {
          */
 
         // check registered status first
-        const nodeURL = await contract.clientURLOf(utils.toHex(cpo.countryCode), utils.toHex(cpo.partyID))
+        const nodeURL = await contract.nodeURLOf(utils.toHex(cpo.countryCode), utils.toHex(cpo.partyID))
 
         if (nodeURL === "") {
 
@@ -171,7 +171,7 @@ async function main() {
     /**
      * Check MSP connection/registration status
      */
-    const nodeURLOfMSP = await contract.clientURLOf(utils.toHex("DE"), utils.toHex("MSP"))
+    const nodeURLOfMSP = await contract.nodeURLOf(utils.toHex("DE"), utils.toHex("MSP"))
 
     const mspRegCheck = await fetch("http://localhost:8080/admin/connection-status/DE/MSP", {
         headers: {
