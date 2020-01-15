@@ -9,6 +9,7 @@ app.use(morgan(`EMSP [DE MSP] -- :method :url :status :res[content-length] - :re
 
 
 function authorize(req, res, next) {
+    console.log(req.headers)
     if (req.headers["authorization"] !== "Token abc-123") {
         return res.status(401).send({
             status_code: 2001,
@@ -25,7 +26,7 @@ app.get("/ocpi/versions", authorize, async (req, res) => {
         data: {
             versions: [{
                 version: "2.2",
-                url: "http://localhost:3001/ocpi/2.2"
+                url: "http://localhost:3002/ocpi/2.2"
             }]
         },
         timestamp: new Date()
@@ -41,12 +42,12 @@ app.get("/ocpi/2.2", authorize, async (req, res) => {
                 {
                     "identifier": "cdrs",
                     "role": "RECEIVER",
-                    "url": "http://localhost:3001/ocpi/emsp/2.2/cdrs"
+                    "url": "http://localhost:3002/ocpi/emsp/2.2/cdrs"
                 },
                 {
                     "identifier": "commands",
                     "role": "SENDER",
-                    "url": "http://localhost:3001/ocpi/emsp/2.2/commands"
+                    "url": "http://localhost:3002/ocpi/emsp/2.2/commands"
                 }
             ]
         },
@@ -75,7 +76,7 @@ app.get("/ocpi/emsp/2.2/cdrs/1", authorize, async (req, res) => {
 app.post("/ocpi/emsp/2.2/cdrs", authorize, async (req, res) => {
     cdr = req.body
     res.set({
-        "Location": "http://localhost:3001/ocpi/emsp/2.2/cdrs/1"
+        "Location": "http://localhost:3002/ocpi/emsp/2.2/cdrs/1"
     }).send({
         status_code: 1000,
         timestamp: new Date()
@@ -83,5 +84,5 @@ app.post("/ocpi/emsp/2.2/cdrs", authorize, async (req, res) => {
 })
 
 module.exports = {
-    start: async () => new Promise((resolve, _) => app.listen("3001", resolve))
+    start: async () => new Promise((resolve, _) => app.listen("3002", resolve))
 }
