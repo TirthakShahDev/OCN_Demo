@@ -3,6 +3,8 @@ const express = require("express")
 const morgan = require("morgan")
 const bodyParser = require("body-parser")
 const fetch = require("node-fetch")
+const ethers = require("ethers")
+const Notary = require("@shareandcharge/ocn-notary").default
 
 const cpoData = require("./cpo-data.json")
 
@@ -54,6 +56,62 @@ module.exports = class CpoBackend {
         next()
     }
 
+    verifySignature(req, res, next) {
+        if (!req.headers["ocn-signature"]) {
+            return res.send({
+                status_code: 2001,
+                status_message: "Missing expected OCN-Signature header",
+                timestamp: new Date()
+            })
+        }
+        try {
+            console.log({
+                headers: {
+                    "x-correlation-id": req.headers["x-correlation-id"],
+                    "ocpi-from-country-code": req.headers["ocpi-from-country-code"],
+                    "ocpi-from-party-id": req.headers["ocpi-from-party-id"],
+                    "ocpi-to-country-code": req.headers["ocpi-to-country-code"],
+                    "ocpi-to-party-id": req.headers["ocpi-to-party-id"]
+                },
+                params: req.params,
+                body: req.body
+            })
+            const {isValid, error} = Notary.deserialize(req.headers["ocn-signature"]).verify({
+                headers: {
+                    "x-correlation-id": req.headers["x-correlation-id"],
+                    "ocpi-from-country-code": req.headers["ocpi-from-country-code"],
+                    "ocpi-from-party-id": req.headers["ocpi-from-party-id"],
+                    "ocpi-to-country-code": req.headers["ocpi-to-country-code"],
+                    "ocpi-to-party-id": req.headers["ocpi-to-party-id"]
+                },
+                params: req.params,
+                body: req.body
+            })
+            if (isValid) {
+                next()
+            } else {
+                throw Error(error)
+            }
+        } catch (err) {
+            return res.send({
+                status_code: 2001,
+                status_message: `Unable to verify signature: ${err.message}`
+            })
+        }
+    }
+
+    async signMessage(headers, params, body) { 
+        const privkey = ethers.Wallet.createRandom().privateKey
+        const notary = new Notary()
+        console.log({headers,params,body})
+        await notary.sign({
+            headers,
+            params,
+            body
+        }, privkey)
+        return notary.serialize()
+    }
+
     initAppRoutes() {
         this.app.get("/ocpi/versions", this.authorize, async (req, res) => {
             res.send({
@@ -95,7 +153,7 @@ module.exports = class CpoBackend {
             })
         })
 
-        this.app.get("/ocpi/cpo/2.2/locations", this.authorize, async (req, res) => {
+        this.app.get("/ocpi/cpo/2.2/locations", this.authorize, this.verifySignature, async (req, res) => {
             res.links({
                 next: `http://localhost:${this.cpoInfo.backendPort}/ocpi/cpo/2.2/locations`
             }).set({
@@ -108,7 +166,7 @@ module.exports = class CpoBackend {
             })
         })
 
-        this.app.get("/ocpi/cpo/2.2/locations/:id", this.authorize, async (req, res) => {
+        this.app.get("/ocpi/cpo/2.2/locations/:id", this.authorize, this.verifySignature, async (req, res) => {
             const location = cpoData.locations.find(loc => loc.id === req.params.id)
             if (location) {
                 res.send({
@@ -125,7 +183,7 @@ module.exports = class CpoBackend {
             }
         })
 
-        this.app.get("/ocpi/cpo/2.2/locations/:id/:evse", this.authorize, async (req, res) => {
+        this.app.get("/ocpi/cpo/2.2/locations/:id/:evse", this.authorize, this.verifySignature, async (req, res) => {
             const location = cpoData.locations.find(loc => loc.id === req.params.id)
             if (location) {
                 const evse = location.evses.find(evse => evse.uid === req.params.evse)
@@ -151,7 +209,7 @@ module.exports = class CpoBackend {
             }
         })
 
-        this.app.get("/ocpi/cpo/2.2/locations/:id/:evse/:connector", this.authorize, async (req, res) => {
+        this.app.get("/ocpi/cpo/2.2/locations/:id/:evse/:connector", this.authorize, this.verifySignature, async (req, res) => {
             const location = cpoData.locations.find(loc => loc.id === req.params.id)
             if (location) {
                 const evse = location.evses.find(evse => evse.uid === req.params.evse)
@@ -186,7 +244,7 @@ module.exports = class CpoBackend {
             }
         })
 
-        this.app.get("/ocpi/cpo/2.2/tariffs", this.authorize, async (req, res) => {
+        this.app.get("/ocpi/cpo/2.2/tariffs", this.authorize, this.verifySignature, async (req, res) => {
             res.send({
                 status_code: 1000,
                 data: cpoData.tariffs.map(tariff => this.changeOwner(tariff)),
@@ -194,34 +252,51 @@ module.exports = class CpoBackend {
             })
         })
 
-        this.app.post("/ocpi/cpo/2.2/commands/:command", this.authorize, async (req, res) => {
+        this.app.post("/ocpi/cpo/2.2/commands/:command", this.authorize, this.verifySignature, async (req, res) => {
             setTimeout(async () => {
-                const headers = {
-                    "Content-Type": "application/json",
-                    "Authorization": `Token ${this.readTokenC()}`,
-                    "X-Request-ID": "123",
-                    "X-Correlation-ID": "123",
-                    "OCPI-from-country-code": this.cpoInfo.countryCode,
-                    "OCPI-from-party-id": this.cpoInfo.partyID,
-                    "OCPI-to-country-code": req.headers["ocpi-from-country-code"],
-                    "OCPI-to-party-id": req.headers["ocpi-from-party-id"]
-                }
-
                 console.log(`CPO [${this.cpoInfo.countryCode} ${this.cpoInfo.partyID}] sending async ${req.params.command} response`)
+                
+                const headers = {
+                    // "Content-Type": "application/json",
+                    // "Authorization": `Token ${this.readTokenC()}`,
+                    // "x-request-id": "123",
+                    "x-correlation-id": "123",
+                    "ocpi-from-country-code": this.cpoInfo.countryCode,
+                    "ocpi-from-party-id": this.cpoInfo.partyID,
+                    "ocpi-to-country-code": req.headers["ocpi-from-country-code"],
+                    "ocpi-to-party-id": req.headers["ocpi-from-party-id"]
+                }
+                const body = { result: "ACCEPTED" }
+                
                 const asyncResponseResult = await fetch(req.body.response_url, {
                     method: "POST",
-                    headers,
+                    headers: Object.assign({
+                        "x-request-id": "123",
+                        "ocn-signature": await this.signMessage(headers, undefined, body),
+                        "authorization": `Token ${this.readTokenC()}`,
+                        "content-type": "application/json"
+                    }, headers),
                     body: JSON.stringify({ result: "ACCEPTED" })
                 })
 
                 if (req.params.command === "STOP_SESSION") {
-                    console.log(`CPO [${this.cpoInfo.countryCode} ${this.cpoInfo.partyID}] sending cdr after session end`)                    
+                    
                     setTimeout(async () => {
+                        console.log(`CPO [${this.cpoInfo.countryCode} ${this.cpoInfo.partyID}] sending cdr after session end`)
+
+                        const body = this.changeOwner(cpoData.cdrs)
+
                         const postCdrResult = await fetch(`${this.cpoInfo.node}/ocpi/receiver/2.2/cdrs`, {
                             method: "POST",
-                            headers,
-                            body: JSON.stringify(this.changeOwner(cpoData.cdrs))
+                            headers: Object.assign({
+                                "x-request-id": "123",
+                                "ocn-signature": await this.signMessage(headers, undefined, body),
+                                "authorization": `Token ${this.readTokenC()}`,
+                                "content-type": "application/json"
+                            }, headers),
+                            body: JSON.stringify(body)
                         })
+                        
                         const getCdrResult = await fetch(postCdrResult.headers.get("location"), { headers })
                         const storedCdr = await getCdrResult.json()
                         if (storedCdr.status_code === 1000 && storedCdr.data.id === cpoData.cdrs.id) {
