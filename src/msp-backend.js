@@ -23,12 +23,10 @@ function authorize(req, res, next) {
 app.get("/ocpi/versions", authorize, async (req, res) => {
     res.send({
         status_code: 1000,
-        data: {
-            versions: [{
-                version: "2.2",
-                url: "http://localhost:3002/ocpi/2.2"
-            }]
-        },
+        data: [{
+            version: "2.2",
+            url: "http://localhost:3002/ocpi/2.2"
+        }],
         timestamp: new Date()
     })
 })

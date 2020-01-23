@@ -57,6 +57,9 @@ module.exports = class CpoBackend {
     }
 
     verifySignature(req, res, next) {
+        // disabled for now
+        return next()
+
         if (!req.headers["ocn-signature"]) {
             return res.send({
                 status_code: 2001,
@@ -103,7 +106,6 @@ module.exports = class CpoBackend {
     async signMessage(headers, params, body) { 
         const privkey = ethers.Wallet.createRandom().privateKey
         const notary = new Notary()
-        console.log({headers,params,body})
         await notary.sign({
             headers,
             params,
@@ -116,12 +118,10 @@ module.exports = class CpoBackend {
         this.app.get("/ocpi/versions", this.authorize, async (req, res) => {
             res.send({
                 status_code: 1000,
-                data: {
-                    "versions": [{
-                        "version": "2.2",
-                        "url": `http://localhost:${this.cpoInfo.backendPort}/ocpi/2.2`
-                    }]
-                },
+                data: [{
+                    "version": "2.2",
+                    "url": `http://localhost:${this.cpoInfo.backendPort}/ocpi/2.2`
+                }],
                 timestamp: new Date()
             })
         })

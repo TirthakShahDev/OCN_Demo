@@ -118,7 +118,7 @@ async function main() {
              * Get and store v2.2 endpoints of OCPI module interfaces supported by OCN Node
              */
 
-            const versionDetailRes = await fetch(versionBody.data.versions.find(v => v.version === "2.2").url, {
+            const versionDetailRes = await fetch(versionBody.data.find(v => v.version === "2.2").url, {
                 headers: {
                     "Authorization": `Token ${adminBody.token}`
                 }
