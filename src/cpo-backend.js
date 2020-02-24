@@ -56,53 +56,6 @@ module.exports = class CpoBackend {
         next()
     }
 
-    verifySignature(req, res, next) {
-        // disabled for now
-        return next()
-
-        if (!req.headers["ocn-signature"]) {
-            return res.send({
-                status_code: 2001,
-                status_message: "Missing expected OCN-Signature header",
-                timestamp: new Date()
-            })
-        }
-        try {
-            console.log({
-                headers: {
-                    "x-correlation-id": req.headers["x-correlation-id"],
-                    "ocpi-from-country-code": req.headers["ocpi-from-country-code"],
-                    "ocpi-from-party-id": req.headers["ocpi-from-party-id"],
-                    "ocpi-to-country-code": req.headers["ocpi-to-country-code"],
-                    "ocpi-to-party-id": req.headers["ocpi-to-party-id"]
-                },
-                params: req.params,
-                body: req.body
-            })
-            const {isValid, error} = Notary.deserialize(req.headers["ocn-signature"]).verify({
-                headers: {
-                    "x-correlation-id": req.headers["x-correlation-id"],
-                    "ocpi-from-country-code": req.headers["ocpi-from-country-code"],
-                    "ocpi-from-party-id": req.headers["ocpi-from-party-id"],
-                    "ocpi-to-country-code": req.headers["ocpi-to-country-code"],
-                    "ocpi-to-party-id": req.headers["ocpi-to-party-id"]
-                },
-                params: req.params,
-                body: req.body
-            })
-            if (isValid) {
-                next()
-            } else {
-                throw Error(error)
-            }
-        } catch (err) {
-            return res.send({
-                status_code: 2001,
-                status_message: `Unable to verify signature: ${err.message}`
-            })
-        }
-    }
-
     async signMessage(headers, params, body) { 
         const privkey = ethers.Wallet.createRandom().privateKey
         const notary = new Notary()
@@ -153,7 +106,7 @@ module.exports = class CpoBackend {
             })
         })
 
-        this.app.get("/ocpi/cpo/2.2/locations", this.authorize, this.verifySignature, async (req, res) => {
+        this.app.get("/ocpi/cpo/2.2/locations", this.authorize, async (req, res) => {
             res.links({
                 next: `http://localhost:${this.cpoInfo.backendPort}/ocpi/cpo/2.2/locations`
             }).set({
@@ -166,7 +119,7 @@ module.exports = class CpoBackend {
             })
         })
 
-        this.app.get("/ocpi/cpo/2.2/locations/:id", this.authorize, this.verifySignature, async (req, res) => {
+        this.app.get("/ocpi/cpo/2.2/locations/:id", this.authorize, async (req, res) => {
             const location = cpoData.locations.find(loc => loc.id === req.params.id)
             if (location) {
                 res.send({
@@ -183,7 +136,7 @@ module.exports = class CpoBackend {
             }
         })
 
-        this.app.get("/ocpi/cpo/2.2/locations/:id/:evse", this.authorize, this.verifySignature, async (req, res) => {
+        this.app.get("/ocpi/cpo/2.2/locations/:id/:evse", this.authorize, async (req, res) => {
             const location = cpoData.locations.find(loc => loc.id === req.params.id)
             if (location) {
                 const evse = location.evses.find(evse => evse.uid === req.params.evse)
@@ -209,7 +162,7 @@ module.exports = class CpoBackend {
             }
         })
 
-        this.app.get("/ocpi/cpo/2.2/locations/:id/:evse/:connector", this.authorize, this.verifySignature, async (req, res) => {
+        this.app.get("/ocpi/cpo/2.2/locations/:id/:evse/:connector", this.authorize, async (req, res) => {
             const location = cpoData.locations.find(loc => loc.id === req.params.id)
             if (location) {
                 const evse = location.evses.find(evse => evse.uid === req.params.evse)
@@ -244,7 +197,7 @@ module.exports = class CpoBackend {
             }
         })
 
-        this.app.get("/ocpi/cpo/2.2/tariffs", this.authorize, this.verifySignature, async (req, res) => {
+        this.app.get("/ocpi/cpo/2.2/tariffs", this.authorize, async (req, res) => {
             res.send({
                 status_code: 1000,
                 data: cpoData.tariffs.map(tariff => this.changeOwner(tariff)),
@@ -252,7 +205,7 @@ module.exports = class CpoBackend {
             })
         })
 
-        this.app.post("/ocpi/cpo/2.2/commands/:command", this.authorize, this.verifySignature, async (req, res) => {
+        this.app.post("/ocpi/cpo/2.2/commands/:command", this.authorize, async (req, res) => {
             setTimeout(async () => {
                 console.log(`CPO [${this.cpoInfo.countryCode} ${this.cpoInfo.partyID}] sending async ${req.params.command} response`)
                 

@@ -9,7 +9,6 @@ app.use(morgan(`EMSP [DE MSP] -- :method :url :status :res[content-length] - :re
 
 
 function authorize(req, res, next) {
-    console.log(req.headers)
     if (req.headers["authorization"] !== "Token abc-123") {
         return res.status(401).send({
             status_code: 2001,
