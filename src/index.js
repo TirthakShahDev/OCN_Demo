@@ -15,37 +15,58 @@
 */
 const fetch = require("node-fetch")
 const ethers = require("ethers")
+const Registry = require("@shareandcharge/ocn-registry").Registry
 const CpoBackend = require("./cpo-backend")
 const mspBackend = require("./msp-backend")
-const signer = require("./lib/signer")
-const utils = require("./lib/utils")
+
+const SPENDER = "0x1c3e5453c0f9aa74a8eb0216310b2b013f017813a648fce364bf41dbc0b37647"
+
+const nodes = [
+    {
+        privateKey: "0x1c3e5453c0f9aa74a8eb0216310b2b013f017813a648fce364bf41dbc0b37647",
+        domain: "http://localhost:8080",
+    },
+    {
+        privateKey: "0x0dbbe8e4ae425a6d2687f1a7e3ba17bc98c673636790f1b8ad91193c05875ef1",
+        domain: "http://localhost:8081"
+    }
+]
 
 const cpoInfo = [
     {
         partyID: "CPO",
         countryCode: "DE",
-        backendPort: "3100",
-        node: "http://localhost:8080"
+        roles: [1],
+        operator: "0x9bC1169Ca09555bf2721A5C9eC6D69c8073bfeB4",
+        node: "http://localhost:8080",
+        backendPort: "3100"
     },
     {
         partyID: "CPX",
         countryCode: "NL",
-        backendPort: "3101",
-        node: "http://localhost:8081"
+        roles: [1],
+        operator: "0xC5fdf4076b8F3A5357c5E395ab970B5B54098Fef",
+        node: "http://localhost:8081",
+        backendPort: "3101"
     }
 ]
 
 
 async function main() {
 
-    // setup wallet to send a transaction  (it doesn't need to be the same as the CPO which signs the data)
-    const provider = new ethers.providers.JsonRpcProvider("http://localhost:8544")
-    let wallet = ethers.Wallet.fromMnemonic("candy maple cake sugar pudding cream honey rich smooth crumble sweet treat")
-    wallet = wallet.connect(provider)
+    const registry = new Registry("local", SPENDER)
 
-    // load the OCN Registry contract using its address and ABI
-    const contract = new ethers.Contract("0x345cA3e014Aaf5dcA488057592ee47305D9B3e10", require("./registry.json"), wallet)
-
+    /**
+     * Register OCN Node Operator(s)
+     */
+    for (const node of nodes) {
+        const wallet = new ethers.Wallet(node.privateKey)
+        const exists = await registry.getNode(wallet.address)
+        if (!exists) {
+            await registry.setNodeRaw(node.domain, node.privateKey)
+        }
+    }
+    
 
     /**
      * Setup each of the CPOs
@@ -63,24 +84,17 @@ async function main() {
          * Register to OCN Registry (if not already)
          */
 
-        // check registered status first
-        const nodeURL = await contract.nodeURLOf(utils.toHex(cpo.countryCode), utils.toHex(cpo.partyID))
+        const party = await registry.getPartyByOcpi(cpo.countryCode, cpo.partyID)
 
-        if (nodeURL === "") {
+        if (!party || party.node.url === "") {
 
             /**
              * Register to OCN Registry
              */
 
-            // Get OCN node info
-            const nodeInfoRes = await fetch(`${cpo.node}/ocn/registry/node-info`)
-            const nodeInfoBody = await nodeInfoRes.json()
-
-            // sign the transaction data with the CPO's wallet (in this case randomly created)
-            const data = await signer.sign(utils.toHex(cpo.countryCode), utils.toHex(cpo.partyID), nodeInfoBody.url, nodeInfoBody.address, ethers.Wallet.createRandom())
-            const tx = await contract.register(...data)
-
-            await tx.wait()
+            // add party to registry
+            const key = ethers.Wallet.createRandom().privateKey
+            await registry.setPartyRaw(cpo.countryCode, cpo.partyID, cpo.roles, cpo.operator, key)
 
             console.log(`CPO [${cpo.countryCode} ${cpo.partyID}] written into OCN Registry with OCN node ${cpo.node}`)
         } else {
@@ -186,7 +200,7 @@ async function main() {
     /**
      * Check MSP connection/registration status
      */
-    const nodeURLOfMSP = await contract.nodeURLOf(utils.toHex("DE"), utils.toHex("MSP"))
+    const msp = await registry.getPartyByOcpi("DE", "MSP")
 
     const mspRegCheck = await fetch("http://localhost:8080/admin/connection-status/DE/MSP", {
         headers: {
@@ -196,7 +210,7 @@ async function main() {
 
     const mspRegCheckText = await mspRegCheck.text()
 
-    console.log(`MSP [DE MSP] connection status: [${nodeURLOfMSP !== "" ? "x" : " "}] OCN Registry [${mspRegCheckText === "CONNECTED" ? "x" : " "}] OCN Node`)
+    console.log(`MSP [DE MSP] connection status: [${(msp && msp.node.url !== "") ? "x" : " "}] OCN Registry [${mspRegCheckText === "CONNECTED" ? "x" : " "}] OCN Node`)
 
 }
 
