@@ -13,9 +13,9 @@
   "dependencies": {
     "@shareandcharge/ocn-notary": "^0.1.0",
     "@shareandcharge/ocn-registry": "^0.1.0",
-    "body-parser": "^1.19.0",
+    "body-parser": "^1.20.1",
     "ethers": "^4.0.33",
-    "express": "^4.17.1",
+    "express": "^4.18.2",
     "morgan": "^1.9.1",
     "node-fetch": "^2.6.0",
     "uuid": "^3.3.2",
